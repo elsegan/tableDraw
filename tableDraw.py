@@ -14,6 +14,7 @@ class mainWindow(QDialog):
         super(mainWindow,self).__init__(parent)
         self.setFixedSize(1200,1200)
         self.setWindowTitle('tableDraw Tool')
+        self.guiCols = 4
 
         self.globalFont = QtGui.QFont('consolas',10)
         self.wStatement = QLabel('I\'ll tell you the number of cuts horizontal, vertical and their width')
@@ -22,13 +23,14 @@ class mainWindow(QDialog):
         self.createGroupPanel()
         self.createGroupPieces()
         self.createGroupCalc()
+        self.createGroupSaw()
 
-        self.guiCols = 4
         mainLayout = QGridLayout()
         mainLayout.addWidget(self.wStatement,0,0,4,self.guiCols)
-        mainLayout.addWidget(self.gPanel,4,0,1,2)
-        mainLayout.addWidget(self.gPieces,4,2,1,2)
-        mainLayout.addWidget(self.gCalc,5,0,1,self.guiCols)
+        mainLayout.addWidget(self.gPanel,4,0,2,2)
+        mainLayout.addWidget(self.gPieces,4,2,2,2)
+        mainLayout.addWidget(self.gSaw,6,0,1,self.guiCols)
+        mainLayout.addWidget(self.gCalc,7,0,1,self.guiCols)
 
         self.setLayout(mainLayout)
 
@@ -68,15 +70,16 @@ class mainWindow(QDialog):
         lText.setFont(self.globalFont)
         dText = QLabel('Piece Depth  (mm) :')
         dText.setFont(self.globalFont)
-        wText = QLabel('Panel Width  (mm) :')
+        wText = QLabel('Piece Width  (mm) :')
         wText.setFont(self.globalFont)
 
         self.lEdit = QLineEdit(str(0))
         self.lEdit.setFont(self.globalFont)
         self.dEdit = QLineEdit(str(0))
         self.dEdit.setFont(self.globalFont)
-        self.wEdit = QLabel(self.zEdit.text())
+        self.wEdit = QLineEdit(self.zEdit.text())
         self.wEdit.setFont(self.globalFont)
+        self.wEdit.setReadOnly(True)
 
         panelLayout = QGridLayout()
         panelLayout.addWidget(lText,0,0)
@@ -88,28 +91,57 @@ class mainWindow(QDialog):
 
         self.gPieces.setLayout(panelLayout)
 
+    def createGroupSaw(self):
+        self.gSaw = QGroupBox('Saw Parameters')
+        self.gSaw.setFont(self.globalFont)
+
+        wSaw = QLabel('Saw Width (mm) :')
+        wSaw.setFont(self.globalFont)
+        wDep = QLabel('Twiddle   (mm) :')
+        wDep.setFont(self.globalFont)
+        
+        self.wSawEdit = QLineEdit(str(0))
+        self.wSawEdit.setFont(self.globalFont)
+        self.wDepEdit = QLineEdit(str(0))
+        self.wDepEdit.setFont(self.globalFont)
+
+        panelLayout = QGridLayout()
+
+        panelLayout.addWidget(wSaw,0,0)
+        panelLayout.addWidget(self.wSawEdit,0,1)
+        panelLayout.addWidget(wDep,0,2)
+        panelLayout.addWidget(self.wDepEdit,0,3)
+
+        self.gSaw.setLayout(panelLayout)
+
     def createGroupCalc(self):
         self.gCalc = QGroupBox('Calculation Result')
         self.gCalc.setFont(self.globalFont)
 
-        self.numCols = QLabel('Cuts X : 0')
-        self.numCols.setFont(self.globalFont)
-        self.numRows = QLabel('Cuts Y : 0')
-        self.numRows.setFont(self.globalFont)
-        self.rotated = QLabel('No Rotation')
-        self.rotated.setFont(self.globalFont)
-        self.numPieces = QLabel('Pieces : 0')
-        self.numPieces.setFont(self.globalFont)
+        self.wNumCols = QLabel('Cuts X : 0')
+        self.wNumCols.setFont(self.globalFont)
+        self.wNumRows = QLabel('Cuts Y : 0')
+        self.wNumRows.setFont(self.globalFont)
+        self.wRotated = QLabel('No Rotation')
+        self.wRotated.setFont(self.globalFont)
+        self.wNumPieces = QLabel('Pieces : 0')
+        self.wNumPieces.setFont(self.globalFont)
+        self.wCalcButton = QPushButton('Calculate Result')
+        self.wCalcButton.setFont(self.globalFont)
+        self.wCalcButton.clicked.connect(lambda: self.eval())
 
         panelLayout = QGridLayout()
 
-        panelLayout.addWidget(self.numCols,0,0)
-        panelLayout.addWidget(self.numRows,0,1)
-        panelLayout.addWidget(self.rotated,0,2)
-        panelLayout.addWidget(self.numPieces,0,3)
+        panelLayout.addWidget(self.wNumCols,0,0)
+        panelLayout.addWidget(self.wNumRows,0,1)
+        panelLayout.addWidget(self.wRotated,0,2)
+        panelLayout.addWidget(self.wNumPieces,0,3)
+        panelLayout.addWidget(self.wCalcButton,1,0,1,self.guiCols)
 
         self.gCalc.setLayout(panelLayout)
 
+    def eval(self):
+        print('Calculate Result Button was Pressed')
 
 if __name__ == "__main__":
     app = QApplication([])
