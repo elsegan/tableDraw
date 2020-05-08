@@ -17,7 +17,7 @@ class mainWindow(QDialog):
         self.guiCols = 4
 
         self.globalFont = QtGui.QFont('consolas',10)
-        self.wStatement = QLabel('I\'ll tell you the number of cuts horizontal, vertical and their width')
+        self.wStatement = QLabel('I\'ll tell you the number of cuts horizontal, vertical and their width\n \n \n \n ')
         self.wStatement.setFont(self.globalFont)
 
         self.createGroupPanel()
@@ -26,13 +26,14 @@ class mainWindow(QDialog):
         self.createGroupSaw()
 
         mainLayout = QGridLayout()
-        mainLayout.addWidget(self.wStatement,0,0,4,self.guiCols)
-        mainLayout.addWidget(self.gPanel,4,0,2,2)
-        mainLayout.addWidget(self.gPieces,4,2,2,2)
-        mainLayout.addWidget(self.gSaw,6,0,1,self.guiCols)
-        mainLayout.addWidget(self.gCalc,7,0,1,self.guiCols)
+        mainLayout.addWidget(self.wStatement,0,0,1,self.guiCols)
+        mainLayout.addWidget(self.gPanel,1,0,2,2)
+        mainLayout.addWidget(self.gPieces,1,2,2,2)
+        mainLayout.addWidget(self.gSaw,3,0,1,self.guiCols)
+        mainLayout.addWidget(self.gCalc,4,0,1,self.guiCols)
 
         self.setLayout(mainLayout)
+        self.calc()
 
     def createGroupPanel(self):
         self.gPanel = QGroupBox("Panel Dimensions")
@@ -45,11 +46,11 @@ class mainWindow(QDialog):
         zText = QLabel('Panel Z (mm) :')
         zText.setFont(self.globalFont)
 
-        self.xEdit = QLineEdit(str(0))
+        self.xEdit = QLineEdit(str(2400))
         self.xEdit.setFont(self.globalFont)
-        self.yEdit = QLineEdit(str(0))
+        self.yEdit = QLineEdit(str(1200))
         self.yEdit.setFont(self.globalFont)
-        self.zEdit = QLineEdit(str(0))
+        self.zEdit = QLineEdit(str(18))
         self.zEdit.setFont(self.globalFont)
 
         panelLayout = QGridLayout()
@@ -73,9 +74,9 @@ class mainWindow(QDialog):
         wText = QLabel('Piece Width  (mm) :')
         wText.setFont(self.globalFont)
 
-        self.lEdit = QLineEdit(str(0))
+        self.lEdit = QLineEdit(str(60))
         self.lEdit.setFont(self.globalFont)
-        self.dEdit = QLineEdit(str(0))
+        self.dEdit = QLineEdit(str(30))
         self.dEdit.setFont(self.globalFont)
         self.wEdit = QLineEdit(self.zEdit.text())
         self.wEdit.setFont(self.globalFont)
@@ -95,22 +96,22 @@ class mainWindow(QDialog):
         self.gSaw = QGroupBox('Saw Parameters')
         self.gSaw.setFont(self.globalFont)
 
-        wSaw = QLabel('Saw Width (mm) :')
-        wSaw.setFont(self.globalFont)
-        wDep = QLabel('Twiddle   (mm) :')
-        wDep.setFont(self.globalFont)
+        saw = QLabel('Saw Width (mm) :')
+        saw.setFont(self.globalFont)
+        dep = QLabel('Twiddle   (mm) :')
+        dep.setFont(self.globalFont)
         
-        self.wSawEdit = QLineEdit(str(0))
-        self.wSawEdit.setFont(self.globalFont)
-        self.wDepEdit = QLineEdit(str(0))
-        self.wDepEdit.setFont(self.globalFont)
+        self.sawEdit = QLineEdit(str(3))
+        self.sawEdit.setFont(self.globalFont)
+        self.depEdit = QLineEdit(str(1))
+        self.depEdit.setFont(self.globalFont)
 
         panelLayout = QGridLayout()
 
-        panelLayout.addWidget(wSaw,0,0)
-        panelLayout.addWidget(self.wSawEdit,0,1)
-        panelLayout.addWidget(wDep,0,2)
-        panelLayout.addWidget(self.wDepEdit,0,3)
+        panelLayout.addWidget(saw,0,0)
+        panelLayout.addWidget(self.sawEdit,0,1)
+        panelLayout.addWidget(dep,0,2)
+        panelLayout.addWidget(self.depEdit,0,3)
 
         self.gSaw.setLayout(panelLayout)
 
@@ -122,11 +123,11 @@ class mainWindow(QDialog):
         self.wNumCols.setFont(self.globalFont)
         self.wNumRows = QLabel('Cuts Y : 0')
         self.wNumRows.setFont(self.globalFont)
-        self.wRotated = QLabel('No Rotation')
+        self.wRotated = QLabel('Rotation : 0')
         self.wRotated.setFont(self.globalFont)
         self.wNumPieces = QLabel('Pieces : 0')
         self.wNumPieces.setFont(self.globalFont)
-        self.wCalcButton = QPushButton('Calculate Result')
+        self.wCalcButton = QPushButton('Calculate Number of Pieces')
         self.wCalcButton.setFont(self.globalFont)
         self.wCalcButton.clicked.connect(lambda: self.eval())
 
@@ -141,7 +142,106 @@ class mainWindow(QDialog):
         self.gCalc.setLayout(panelLayout)
 
     def eval(self):
-        print('Calculate Result Button was Pressed')
+        self.checkData()
+
+        if (self.dataOK):
+            self.calc()
+        else:
+            self.wStatement.setText('There was something wrong with your dimensions\n'
+                                    + 'It can\'t possibly exist!\n \n \n ')
+
+    def checkData(self):
+        self.dataOK = True
+
+        # Check the Panel data
+        self.dataOK &= self.testInt(self.xEdit)
+        self.dataOK &= self.testInt(self.yEdit)
+        self.dataOK &= self.testInt(self.zEdit)
+
+        # Force the z data and Width data to be aligned
+        self.wEdit.setText(self.zEdit.text())
+        
+        # Check the Piece data
+        self.dataOK &= self.testInt(self.lEdit)
+        self.dataOK &= self.testInt(self.dEdit)
+        self.dataOK &= self.testInt(self.wEdit)
+
+        # Check the Saw data
+        self.dataOK &= self.testInt(self.sawEdit)
+        self.dataOK &= self.testInt(self.depEdit)
+
+    def testInt(self, lineEditWidget):
+        # Check that the input can be cast to an int
+        # If is can, make it positive, otherwise make it 0
+        try:
+            deadVar = int(lineEditWidget.text())
+            if (deadVar < 0):
+                lineEditWidget.setText(str(-deadVar))
+            return (deadVar != 0)
+        except:
+            lineEditWidget.setText(str(0))
+            return False
+
+    def calc(self):
+        # Preallocate/precalc some values of the dimensions
+        sawWidth = int(self.sawEdit.text())
+        twiddle  = int(self.depEdit.text())
+        tempX    = int(self.xEdit.text()) + sawWidth
+        tempY    = int(self.yEdit.text()) + sawWidth
+
+        maxArea = int(self.xEdit.text()) * int(self.yEdit.text())
+
+        self.orientation = -1
+
+        tempPieceLength = int(self.lEdit.text()) + sawWidth
+        tempPieceDepth  = int(self.dEdit.text()) + twiddle
+
+        rows   = []
+        cols   = []
+        pieces = []
+
+        # Get non-rotated cuts
+        rows.append(int((tempY + twiddle) / tempPieceDepth))
+        cols.append(int(tempX / tempPieceLength))
+
+        # Get rotated cuts
+        rows.append(int((tempX + twiddle) / tempPieceDepth))
+        cols.append(int(tempY / tempPieceLength))
+
+        # Calc Pieces
+        pieces.append(rows[0] * cols [0])
+        pieces.append(rows[1] * cols [1])
+
+        if ( pieces[0] > pieces[1] ):
+            self.orientation = 0
+        elif ( pieces[1] > 0 ):
+            self.orientation = 1
+
+        usedArea   = pieces[self.orientation] * int(self.lEdit.text()) * int(self.dEdit.text())
+        wasteArea  = (maxArea - usedArea) # mm^2
+        wastage    = wasteArea / (maxArea / 100.0)
+        wasteArea *= 1e-6 # m^2
+        tableArea  = pieces[self.orientation] * int(self.lEdit.text()) * int(self.wEdit.text()) * 1e-6
+
+        cutWasteX  = sawWidth * cols[self.orientation]
+        cutWasteY  = sawWidth * rows[self.orientation]
+        remX       = int(self.xEdit.text()) - cutWasteX
+        remY       = int(self.yEdit.text()) - cutWasteY
+        remArea    = remX * remY
+        sawArea   = (maxArea - remArea) / (maxArea / 100)
+
+        if ( self.orientation == -1 ):
+            self.wStatement.setText('There was something wrong with the dimensions\n'
+                                    + 'It can\'t possibly exist\n \n \n ')
+        else:
+            self.wNumPieces.setText('Pieces : ' + str(pieces[self.orientation]))
+            self.wRotated.setText('Rotation : ' + str(self.orientation))
+            self.wNumCols.setText('Cuts X : ' + str(rows[self.orientation]))
+            self.wNumRows.setText('Cuts Y : ' + str(cols[self.orientation]))
+            self.wStatement.setText('Wow, you actually gave good dimensions \^.^/'
+                                    + '\nThe wastage is : ' + str(wastage) + ' %'
+                                    + '\nBut saw area is :' + str(sawArea) + (' %')
+                                    + '\nThe coverable area is : ' + str(tableArea) + ' m^2\n ')
 
 if __name__ == "__main__":
     app = QApplication([])
