@@ -33,7 +33,7 @@ class mainWindow(QDialog):
         mainLayout.addWidget(self.gCalc,4,0,1,self.guiCols)
 
         self.setLayout(mainLayout)
-        self.calc()
+        self.eval()
 
     def createGroupPanel(self):
         self.gPanel = QGroupBox("Panel Dimensions")
@@ -74,9 +74,11 @@ class mainWindow(QDialog):
         wText = QLabel('Piece Width  (mm) :')
         wText.setFont(self.globalFont)
 
-        self.lEdit = QLineEdit(str(60))
+        # self.lEdit = QLineEdit(str(60))
+        self.lEdit = QLineEdit(str(2400))
         self.lEdit.setFont(self.globalFont)
-        self.dEdit = QLineEdit(str(30))
+        # self.dEdit = QLineEdit(str(30))
+        self.dEdit = QLineEdit(str(1200))
         self.dEdit.setFont(self.globalFont)
         self.wEdit = QLineEdit(self.zEdit.text())
         self.wEdit.setFont(self.globalFont)
@@ -168,80 +170,121 @@ class mainWindow(QDialog):
 
         # Check the Saw data
         self.dataOK &= self.testInt(self.sawEdit)
-        self.dataOK &= self.testInt(self.depEdit)
+        self.dataOK &= self.testInt(self.depEdit,True)
 
-    def testInt(self, lineEditWidget):
+    def testInt(self, lineEditWidget,okZero=False):
         # Check that the input can be cast to an int
         # If is can, make it positive, otherwise make it 0
         try:
             deadVar = int(lineEditWidget.text())
             if (deadVar < 0):
                 lineEditWidget.setText(str(-deadVar))
-            return (deadVar != 0)
+            return (deadVar != 0) or (okZero)
         except:
             lineEditWidget.setText(str(0))
             return False
 
     def calc(self):
-        # Preallocate/precalc some values of the dimensions
+        # Preallocate some values so its easier to read
         sawWidth = int(self.sawEdit.text())
         twiddle  = int(self.depEdit.text())
-        tempX    = int(self.xEdit.text()) + sawWidth
-        tempY    = int(self.yEdit.text()) + sawWidth
+        inputX   = int(self.xEdit.text())
+        inputY   = int(self.yEdit.text())
 
-        maxArea = int(self.xEdit.text()) * int(self.yEdit.text())
-
+        maxArea  = inputX * inputY # in mm^2
         self.orientation = -1
 
-        tempPieceLength = int(self.lEdit.text()) + sawWidth
-        tempPieceDepth  = int(self.dEdit.text()) + twiddle
+        tempLength = float(int(self.lEdit.text()) + sawWidth)
+        tempDepth  = float(int(self.dEdit.text()) + sawWidth + twiddle)
 
         rows   = []
         cols   = []
         pieces = []
 
-        # Get non-rotated cuts
-        rows.append(int((tempY + twiddle) / tempPieceDepth))
-        cols.append(int(tempX / tempPieceLength))
+        # Get the number of non-rotated cuts
+        if (inputX >= int(self.lEdit.text())) and (inputY >= int(self.dEdit.text())):
+            outX0 = inputX - int(self.lEdit.text())
+            outY0 = inputY - int(self.dEdit.text())
+            rows.append(1)
+            cols.append(1)
 
-        # Get rotated cuts
-        rows.append(int((tempX + twiddle) / tempPieceDepth))
-        cols.append(int(tempY / tempPieceLength))
+            cols[0] += int(outX0 / tempLength)
+            rows[0] += int(outY0 / tempDepth)
+        else:
+            cols.append(0)
+            rows.append(0)
 
-        # Calc Pieces
-        pieces.append(rows[0] * cols [0])
-        pieces.append(rows[1] * cols [1])
+        # Get the number of rotated cuts
+        if (inputX >= int(self.dEdit.text())) and (inputY >= int(self.lEdit.text())):
+            outX1 = inputX - int(self.dEdit.text())
+            outY1 = inputY - int(self.lEdit.text())
+            rows.append(1)
+            cols.append(1)
 
-        if ( pieces[0] > pieces[1] ):
+            cols[1] += int(outX1 / tempDepth)
+            rows[1] += int(outY1 / tempLength)
+        else:
+            cols.append(0)
+            rows.append(0)
+
+        # Calculate the number of pieces made
+        pieces.append(rows[0] * cols[0])
+        pieces.append(rows[1] * cols[1])            
+
+        if (pieces[0] >= pieces[1]):
             self.orientation = 0
-        elif ( pieces[1] > 0 ):
+        elif(pieces[1] > 0):
             self.orientation = 1
 
-        usedArea   = pieces[self.orientation] * int(self.lEdit.text()) * int(self.dEdit.text())
-        wasteArea  = (maxArea - usedArea) # mm^2
-        wastage    = wasteArea / (maxArea / 100.0)
-        wasteArea *= 1e-6 # m^2
-        tableArea  = pieces[self.orientation] * int(self.lEdit.text()) * int(self.wEdit.text()) * 1e-6
-
-        cutWasteX  = sawWidth * cols[self.orientation]
-        cutWasteY  = sawWidth * rows[self.orientation]
-        remX       = int(self.xEdit.text()) - cutWasteX
-        remY       = int(self.yEdit.text()) - cutWasteY
-        remArea    = remX * remY
-        sawArea   = (maxArea - remArea) / (maxArea / 100)
-
-        if ( self.orientation == -1 ):
+        warnArea = False
+        if (self.orientation == -1):
             self.wStatement.setText('There was something wrong with the dimensions\n'
                                     + 'It can\'t possibly exist\n \n \n ')
+            
         else:
+            usedArea = (pieces[self.orientation]
+                       * int(self.lEdit.text())
+                       * int(self.dEdit.text())) # mm^2
+
+            sawnArea = ((cols[self.orientation]) * inputX
+                       +(rows[self.orientation]) * inputY
+                       - pieces[self.orientation] * sawWidth * sawWidth)
+            
+            wasteArea = maxArea - usedArea # mm^2
+
+            tableArea = pieces * int(self.wEdit.text()) * int(self.lEdit.text())
+
+            if (wasteArea < 0):
+                wasteArea = 0
+
+            if (sawnArea < 0):
+                sawnArea = 0
+            else:
+                if (cols[self.orientation] == 1) and (rows[self.orientation] == 1):
+                    sawnArea = 0
+                elif (cols[self.orientation] == 1):
+                    sawnArea = rows[self.orientation] * inputY
+                elif (rows[self.orientation] == 1):
+                    sawnArea = cols[self.orientation] * inputX
+            
+            assert(usedArea <= maxArea)
+            assert(wasteArea < maxArea)
+            assert(wasteArea >= sawnArea)
+
             self.wNumPieces.setText('Pieces : ' + str(pieces[self.orientation]))
             self.wRotated.setText('Rotation : ' + str(self.orientation))
             self.wNumCols.setText('Cuts X : ' + str(rows[self.orientation]))
             self.wNumRows.setText('Cuts Y : ' + str(cols[self.orientation]))
             self.wStatement.setText('Wow, you actually gave good dimensions \^.^/'
-                                    + '\nThe wastage is : ' + str(wastage) + ' %'
-                                    + '\nBut saw area is :' + str(sawArea) + (' %')
-                                    + '\nThe coverable area is : ' + str(tableArea) + ' m^2\n ')
+                                    + '\nThe wastage is   : ' + str((wasteArea * 100 / maxArea)) + ' %'
+                                    + '\nBut sawn area is : ' + str((sawnArea * 100 / maxArea)) + ' %'
+                                    + '\nSo real waste is : ' + str((wasteArea - sawnArea) * 100 / maxArea) + ' %\n')
+                                    # + '\nThe coverable area is : ' + str(tableArea) + ' m^2')
+
+        print('used area: ' + str(usedArea))
+        print('sawn area: ' + str(sawnArea))
+        print('max area: '  + str(maxArea))
+        print('waste area: ' + str(wasteArea) + '\n \n ')
 
 if __name__ == "__main__":
     app = QApplication([])
