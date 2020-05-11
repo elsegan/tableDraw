@@ -74,11 +74,9 @@ class mainWindow(QDialog):
         wText = QLabel('Piece Width  (mm) :')
         wText.setFont(self.globalFont)
 
-        # self.lEdit = QLineEdit(str(60))
-        self.lEdit = QLineEdit(str(2400))
+        self.lEdit = QLineEdit(str(60))
         self.lEdit.setFont(self.globalFont)
-        # self.dEdit = QLineEdit(str(30))
-        self.dEdit = QLineEdit(str(1200))
+        self.dEdit = QLineEdit(str(30))
         self.dEdit.setFont(self.globalFont)
         self.wEdit = QLineEdit(self.zEdit.text())
         self.wEdit.setFont(self.globalFont)
@@ -229,7 +227,7 @@ class mainWindow(QDialog):
 
         # Calculate the number of pieces made
         pieces.append(rows[0] * cols[0])
-        pieces.append(rows[1] * cols[1])            
+        pieces.append(rows[1] * cols[1])
 
         if (pieces[0] >= pieces[1]):
             self.orientation = 0
@@ -252,7 +250,10 @@ class mainWindow(QDialog):
             
             wasteArea = maxArea - usedArea # mm^2
 
-            tableArea = pieces * int(self.wEdit.text()) * int(self.lEdit.text())
+            tableArea  = (pieces[self.orientation]
+                         * int(self.wEdit.text())
+                         * int(self.lEdit.text())
+                         * 1e-6)
 
             if (wasteArea < 0):
                 wasteArea = 0
@@ -278,8 +279,8 @@ class mainWindow(QDialog):
             self.wStatement.setText('Wow, you actually gave good dimensions \^.^/'
                                     + '\nThe wastage is   : ' + str((wasteArea * 100 / maxArea)) + ' %'
                                     + '\nBut sawn area is : ' + str((sawnArea * 100 / maxArea)) + ' %'
-                                    + '\nSo real waste is : ' + str((wasteArea - sawnArea) * 100 / maxArea) + ' %\n')
-                                    # + '\nThe coverable area is : ' + str(tableArea) + ' m^2')
+                                    + '\nSo real waste is : ' + str((wasteArea - sawnArea) * 100 / maxArea) + ' %'
+                                    + '\nThe coverable area is : ' + str(tableArea) + ' m^2')
 
         print('used area: ' + str(usedArea))
         print('sawn area: ' + str(sawnArea))
