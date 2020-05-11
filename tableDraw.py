@@ -1,3 +1,5 @@
+import matplotlib.pyplot as plt
+import numpy as np
 
 from PyQt5 import QtGui,QtCore,QtWidgets
 from PyQt5.QtCore import QDateTime, Qt, QTimer,QCoreApplication
@@ -146,6 +148,7 @@ class mainWindow(QDialog):
 
         if (self.dataOK):
             self.calc()
+            self.vizualise()
         else:
             self.wStatement.setText('There was something wrong with your dimensions\n'
                                     + 'It can\'t possibly exist!\n \n \n ')
@@ -244,8 +247,8 @@ class mainWindow(QDialog):
                        * int(self.lEdit.text())
                        * int(self.dEdit.text())) # mm^2
 
-            sawnArea = ((cols[self.orientation]) * inputX
-                       +(rows[self.orientation]) * inputY
+            sawnArea = ((cols[self.orientation]) * inputX * sawWidth
+                       +(rows[self.orientation]) * inputY * sawWidth
                        - pieces[self.orientation] * sawWidth * sawWidth)
             
             wasteArea = maxArea - usedArea # mm^2
@@ -282,10 +285,56 @@ class mainWindow(QDialog):
                                     + '\nSo real waste is : ' + str((wasteArea - sawnArea) * 100 / maxArea) + ' %'
                                     + '\nThe coverable area is : ' + str(tableArea) + ' m^2')
 
-        print('used area: ' + str(usedArea))
-        print('sawn area: ' + str(sawnArea))
-        print('max area: '  + str(maxArea))
-        print('waste area: ' + str(wasteArea) + '\n \n ')
+    def vizualise(self):
+        pCols = int(self.xEdit.text())
+        pRows = int(self.yEdit.text())
+        sawWidth = int(self.sawEdit.text())
+        twiddle  = int(self.depEdit.text())
+
+
+        canvas = np.ones((pRows,pCols))
+
+        if (self.orientation == 0):
+            cutX = int(self.lEdit.text()) + sawWidth
+            cutY = int(self.dEdit.text()) + sawWidth + twiddle
+            widX = sawWidth
+            widY = sawWidth + twiddle
+        elif (self.orientation == 1):
+            cutX = int(self.dEdit.text()) + sawWidth + twiddle
+            cutY = int(self.lEdit.text()) + sawWidth
+            widX = sawWidth + twiddle
+            widY = sawWidth
+        else:
+            return -1
+
+        # Make marks on the columns
+        cCols = cutX
+        fullCol = np.zeros((pRows,1))
+        while (cCols < pCols):
+            canvas[:,cCols] = fullCol[:,0]
+            cCols += cutX
+
+        # Make marks on the columns
+        cRows = cutY
+        fullRow = np.zeros((1,pCols))
+        while (cRows < pRows):
+            canvas[cRows,:] = fullRow[0,:]
+            cRows += cutY
+
+        # Mark off the grey area of true wastage
+        cCols -= cutX
+        cRows -= cutY
+        gCols  = np.ones((pRows,1)) * 0.5
+        gRows  = np.ones((1,pCols)) * 0.5
+
+        for cols in range(cCols,pCols):
+            canvas[:,cols] = gCols[:,0]
+        
+        for rows in range(cRows,pRows):
+            canvas[rows,:] = gRows[0,:]
+
+        plt.imshow(canvas,cmap='gray')
+        plt.show()
 
 if __name__ == "__main__":
     app = QApplication([])
