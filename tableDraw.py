@@ -28,18 +28,19 @@ class mainWindow(QDialog):
         self.createGroupPieces()
         self.createGroupCalc()
         self.createGroupSaw()
+
         # Create image window
         self.wImg = QLabel()
 
         self.eval()
 
         mainLayout = QGridLayout()
-        mainLayout.addWidget(self.wStatement,0,0,2,1)
-        mainLayout.addWidget(self.wImg,0,1,2,3)
-        mainLayout.addWidget(self.gPanel,2,0,2,2)
-        mainLayout.addWidget(self.gPieces,2,2,2,2)
-        mainLayout.addWidget(self.gSaw,4,0,1,self.guiCols)
-        mainLayout.addWidget(self.gCalc,5,0,1,self.guiCols)
+        mainLayout.addWidget(self.wImg,0,0,5,self.guiCols,QtCore.Qt.AlignCenter)
+        mainLayout.addWidget(self.wStatement,5,0,1,self.guiCols,QtCore.Qt.AlignCenter)
+        mainLayout.addWidget(self.gPanel,6,0,2,2)
+        mainLayout.addWidget(self.gPieces,6,2,2,2)
+        mainLayout.addWidget(self.gSaw,8,0,1,self.guiCols)
+        mainLayout.addWidget(self.gCalc,9,0,1,self.guiCols)
 
         self.setLayout(mainLayout)
 
@@ -277,9 +278,9 @@ class mainWindow(QDialog):
                 elif (rows[self.orientation] == 1):
                     sawnArea = cols[self.orientation] * inputX
             
-            assert(usedArea <= maxArea)
-            assert(wasteArea < maxArea)
-            assert(wasteArea >= sawnArea)
+            # assert(usedArea <= maxArea)
+            # assert(wasteArea < maxArea)
+            # assert(wasteArea >= sawnArea)
 
             self.wNumPieces.setText('Pieces : ' + str(pieces[self.orientation]))
             self.wRotated.setText('Rotation : ' + str(self.orientation))
@@ -351,17 +352,23 @@ class mainWindow(QDialog):
         dummyName = 'tempResultant.png'
         cv2.imwrite(dummyName,canvas * 255)
         canvas = cv2.imread(dummyName)
+
+        canvas = self.imageUnskew(canvas)
         
         # Perform image scaling
-        maxCols = 1200
-        scale = maxCols / float(self.xEdit.text())
-        scaledRows = int(scale * float(self.yEdit.text()))
+        maxRows    = 700
+        scale      = maxRows / pRows
+        scaledRows = maxRows
+        scaledCols = int(scale * pCols)
 
-        canvas = cv2.resize(canvas,(maxCols,scaledRows))
+        canvas = cv2.resize(canvas,(scaledCols,scaledRows))
 
         qImg = QtGui.QImage(canvas,canvas.shape[1],canvas.shape[0],QtGui.QImage.Format_RGB888).rgbSwapped()
         pMap = QtGui.QPixmap.fromImage(qImg)
         self.wImg.setPixmap(pMap)
+
+    def imageUnskew(self,npArray):
+        return npArray
 
 if __name__ == "__main__":
     app = QApplication([])
