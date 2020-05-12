@@ -1,9 +1,10 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import cv2
 
 from PyQt5 import QtGui,QtCore,QtWidgets
 from PyQt5.QtCore import QDateTime, Qt, QTimer,QCoreApplication
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtGui import QPixmap, QImage
 from PyQt5.QtWidgets import (QApplication, QGridLayout, QGroupBox, QComboBox,
                              QHBoxLayout, QLabel, QLineEdit, QPushButton,
                              QSizePolicy, QDialog, QTableWidget, QTextEdit,
@@ -14,7 +15,8 @@ print("No Problem ImportingLibraries --> Starting the tool -->")
 class mainWindow(QDialog):
     def __init__(self,parent=None):
         super(mainWindow,self).__init__(parent)
-        self.setFixedSize(1200,1200)
+        scale = 1.4
+        self.setFixedSize(1400 * scale,1000 * scale)
         self.setWindowTitle('tableDraw Tool')
         self.guiCols = 4
 
@@ -26,16 +28,20 @@ class mainWindow(QDialog):
         self.createGroupPieces()
         self.createGroupCalc()
         self.createGroupSaw()
+        # Create image window
+        self.wImg = QLabel()
+
+        self.eval()
 
         mainLayout = QGridLayout()
-        mainLayout.addWidget(self.wStatement,0,0,1,self.guiCols)
-        mainLayout.addWidget(self.gPanel,1,0,2,2)
-        mainLayout.addWidget(self.gPieces,1,2,2,2)
-        mainLayout.addWidget(self.gSaw,3,0,1,self.guiCols)
-        mainLayout.addWidget(self.gCalc,4,0,1,self.guiCols)
+        mainLayout.addWidget(self.wStatement,0,0,2,1)
+        mainLayout.addWidget(self.wImg,0,1,2,3)
+        mainLayout.addWidget(self.gPanel,2,0,2,2)
+        mainLayout.addWidget(self.gPieces,2,2,2,2)
+        mainLayout.addWidget(self.gSaw,4,0,1,self.guiCols)
+        mainLayout.addWidget(self.gCalc,5,0,1,self.guiCols)
 
         self.setLayout(mainLayout)
-        self.eval()
 
     def createGroupPanel(self):
         self.gPanel = QGroupBox("Panel Dimensions")
@@ -292,7 +298,7 @@ class mainWindow(QDialog):
         twiddle  = int(self.depEdit.text())
 
 
-        canvas = np.ones((pRows,pCols))
+        canvas = np.ones((pRows,pCols,3))
 
         if (self.orientation == 0):
             cutX = int(self.lEdit.text()) + sawWidth
@@ -307,34 +313,55 @@ class mainWindow(QDialog):
         else:
             return -1
 
+        imgDim = 3
+
         # Make marks on the columns
         cCols = cutX
-        fullCol = np.zeros((pRows,1))
+        fullCol = np.zeros((pRows,1,imgDim))
         while (cCols < pCols):
-            canvas[:,cCols] = fullCol[:,0]
+
+            for i in range(widX):
+                canvas[:,cCols - i,:] = fullCol[:,0,:]
+
             cCols += cutX
 
         # Make marks on the columns
         cRows = cutY
-        fullRow = np.zeros((1,pCols))
+        fullRow = np.zeros((1,pCols,imgDim))
         while (cRows < pRows):
-            canvas[cRows,:] = fullRow[0,:]
+            for i in range(widY):
+                canvas[cRows - i,:,:] = fullRow[0,:,:]
+
             cRows += cutY
 
         # Mark off the grey area of true wastage
         cCols -= cutX
         cRows -= cutY
-        gCols  = np.ones((pRows,1)) * 0.5
-        gRows  = np.ones((1,pCols)) * 0.5
+        gCols  = np.ones((pRows,1,imgDim)) * 0.5
+        gRows  = np.ones((1,pCols,imgDim)) * 0.5
 
-        for cols in range(cCols,pCols):
-            canvas[:,cols] = gCols[:,0]
+        if cCols > 0:
+            for cols in range(cCols,pCols):
+                canvas[:,cols,:] = gCols[:,0,:]
         
-        for rows in range(cRows,pRows):
-            canvas[rows,:] = gRows[0,:]
+        if cRows > 0:
+            for rows in range(cRows,pRows):
+                canvas[rows,:,:] = gRows[0,:,:]
+    
+        dummyName = 'tempResultant.png'
+        cv2.imwrite(dummyName,canvas * 255)
+        canvas = cv2.imread(dummyName)
+        
+        # Perform image scaling
+        maxCols = 1200
+        scale = maxCols / float(self.xEdit.text())
+        scaledRows = int(scale * float(self.yEdit.text()))
 
-        plt.imshow(canvas,cmap='gray')
-        plt.show()
+        canvas = cv2.resize(canvas,(maxCols,scaledRows))
+
+        qImg = QtGui.QImage(canvas,canvas.shape[1],canvas.shape[0],QtGui.QImage.Format_RGB888).rgbSwapped()
+        pMap = QtGui.QPixmap.fromImage(qImg)
+        self.wImg.setPixmap(pMap)
 
 if __name__ == "__main__":
     app = QApplication([])
