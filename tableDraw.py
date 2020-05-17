@@ -1,7 +1,10 @@
+import matplotlib.pyplot as plt
+import numpy as np
+import cv2
 
 from PyQt5 import QtGui,QtCore,QtWidgets
 from PyQt5.QtCore import QDateTime, Qt, QTimer,QCoreApplication
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtGui import QPixmap, QImage
 from PyQt5.QtWidgets import (QApplication, QGridLayout, QGroupBox, QComboBox,
                              QHBoxLayout, QLabel, QLineEdit, QPushButton,
                              QSizePolicy, QDialog, QTableWidget, QTextEdit,
@@ -12,7 +15,8 @@ print("No Problem ImportingLibraries --> Starting the tool -->")
 class mainWindow(QDialog):
     def __init__(self,parent=None):
         super(mainWindow,self).__init__(parent)
-        self.setFixedSize(1200,1200)
+        scale = 1.4
+        self.setFixedSize(1400 * scale,1000 * scale)
         self.setWindowTitle('tableDraw Tool')
         self.guiCols = 4
 
@@ -25,15 +29,20 @@ class mainWindow(QDialog):
         self.createGroupCalc()
         self.createGroupSaw()
 
+        # Create image window
+        self.wImg = QLabel()
+
+        self.eval()
+
         mainLayout = QGridLayout()
-        mainLayout.addWidget(self.wStatement,0,0,1,self.guiCols)
-        mainLayout.addWidget(self.gPanel,1,0,2,2)
-        mainLayout.addWidget(self.gPieces,1,2,2,2)
-        mainLayout.addWidget(self.gSaw,3,0,1,self.guiCols)
-        mainLayout.addWidget(self.gCalc,4,0,1,self.guiCols)
+        mainLayout.addWidget(self.wImg,0,0,5,self.guiCols,QtCore.Qt.AlignCenter)
+        mainLayout.addWidget(self.wStatement,5,0,1,self.guiCols,QtCore.Qt.AlignCenter)
+        mainLayout.addWidget(self.gPanel,6,0,2,2)
+        mainLayout.addWidget(self.gPieces,6,2,2,2)
+        mainLayout.addWidget(self.gSaw,8,0,1,self.guiCols)
+        mainLayout.addWidget(self.gCalc,9,0,1,self.guiCols)
 
         self.setLayout(mainLayout)
-        self.eval()
 
     def createGroupPanel(self):
         self.gPanel = QGroupBox("Panel Dimensions")
@@ -146,6 +155,7 @@ class mainWindow(QDialog):
 
         if (self.dataOK):
             self.calc()
+            self.vizualise()
         else:
             self.wStatement.setText('There was something wrong with your dimensions\n'
                                     + 'It can\'t possibly exist!\n \n \n ')
@@ -244,8 +254,8 @@ class mainWindow(QDialog):
                        * int(self.lEdit.text())
                        * int(self.dEdit.text())) # mm^2
 
-            sawnArea = ((cols[self.orientation]) * inputX
-                       +(rows[self.orientation]) * inputY
+            sawnArea = ((cols[self.orientation]) * inputX * sawWidth
+                       +(rows[self.orientation]) * inputY * sawWidth
                        - pieces[self.orientation] * sawWidth * sawWidth)
             
             wasteArea = maxArea - usedArea # mm^2
@@ -268,9 +278,9 @@ class mainWindow(QDialog):
                 elif (rows[self.orientation] == 1):
                     sawnArea = cols[self.orientation] * inputX
             
-            assert(usedArea <= maxArea)
-            assert(wasteArea < maxArea)
-            assert(wasteArea >= sawnArea)
+            # assert(usedArea <= maxArea)
+            # assert(wasteArea < maxArea)
+            # assert(wasteArea >= sawnArea)
 
             self.wNumPieces.setText('Pieces : ' + str(pieces[self.orientation]))
             self.wRotated.setText('Rotation : ' + str(self.orientation))
@@ -282,10 +292,83 @@ class mainWindow(QDialog):
                                     + '\nSo real waste is : ' + str((wasteArea - sawnArea) * 100 / maxArea) + ' %'
                                     + '\nThe coverable area is : ' + str(tableArea) + ' m^2')
 
-        print('used area: ' + str(usedArea))
-        print('sawn area: ' + str(sawnArea))
-        print('max area: '  + str(maxArea))
-        print('waste area: ' + str(wasteArea) + '\n \n ')
+    def vizualise(self):
+        pCols = int(self.xEdit.text())
+        pRows = int(self.yEdit.text())
+        sawWidth = int(self.sawEdit.text())
+        twiddle  = int(self.depEdit.text())
+
+
+        canvas = np.ones((pRows,pCols,3))
+
+        if (self.orientation == 0):
+            cutX = int(self.lEdit.text()) + sawWidth
+            cutY = int(self.dEdit.text()) + sawWidth + twiddle
+            widX = sawWidth
+            widY = sawWidth + twiddle
+        elif (self.orientation == 1):
+            cutX = int(self.dEdit.text()) + sawWidth + twiddle
+            cutY = int(self.lEdit.text()) + sawWidth
+            widX = sawWidth + twiddle
+            widY = sawWidth
+        else:
+            return -1
+
+        imgDim = 3
+
+        # Make marks on the columns
+        cCols = cutX
+        fullCol = np.zeros((pRows,1,imgDim))
+        while (cCols < pCols):
+
+            for i in range(widX):
+                canvas[:,cCols - i,:] = fullCol[:,0,:]
+
+            cCols += cutX
+
+        # Make marks on the columns
+        cRows = cutY
+        fullRow = np.zeros((1,pCols,imgDim))
+        while (cRows < pRows):
+            for i in range(widY):
+                canvas[cRows - i,:,:] = fullRow[0,:,:]
+
+            cRows += cutY
+
+        # Mark off the grey area of true wastage
+        cCols -= cutX
+        cRows -= cutY
+        gCols  = np.ones((pRows,1,imgDim)) * 0.5
+        gRows  = np.ones((1,pCols,imgDim)) * 0.5
+
+        if cCols > 0:
+            for cols in range(cCols,pCols):
+                canvas[:,cols,:] = gCols[:,0,:]
+        
+        if cRows > 0:
+            for rows in range(cRows,pRows):
+                canvas[rows,:,:] = gRows[0,:,:]
+    
+        dummyName = 'tempResultant.png'
+        cv2.imwrite(dummyName,canvas * 255)
+        canvas = cv2.imread(dummyName)
+
+        canvas = self.imageUnskew(canvas)
+        
+        # Perform image scaling
+        maxRows    = 700
+        scale      = maxRows / pRows
+        scaledRows = maxRows
+        scaledCols = int(scale * pCols)
+
+        canvas = cv2.resize(canvas,(scaledCols,scaledRows))
+
+        qImg = QtGui.QImage(canvas,canvas.shape[1],canvas.shape[0],QtGui.QImage.Format_RGB888).rgbSwapped()
+        pMap = QtGui.QPixmap.fromImage(qImg)
+        self.wImg.setPixmap(pMap)
+
+    def imageUnskew(self,npArray):
+        return npArray
 
 if __name__ == "__main__":
     app = QApplication([])
