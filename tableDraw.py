@@ -268,18 +268,12 @@ class mainWindow(QDialog):
                        * int(self.lEdit.text())
                        * int(self.dEdit.text())) # mm^2
 
+            sawnArea = (pieces[self.orientation]
+                        * (  tempLength
+                           + tempDepth
+                           - sawWidth)
+                        * sawWidth)
 
-            if self.orientation == 0:
-                sawnArea = ((cols[0]) * inputX * sawWidth
-                           +(rows[0]) * inputY * sawWidth
-                           - pieces[0] * sawWidth * sawWidth)
-            elif self.orientation == 1:
-                sawnArea = ((cols[1]) * inputY * sawWidth
-                           +(rows[1]) * inputX * sawWidth
-                           - pieces[1] * sawWidth * sawWidth)
-
-
-            
             wasteArea = maxArea - usedArea # mm^2
 
             tableArea  = (pieces[self.orientation]
@@ -287,22 +281,22 @@ class mainWindow(QDialog):
                          * int(self.lEdit.text())
                          * 1e-6)
 
-            if (cols[self.orientation] == 1) and (rows[self.orientation] == 1):
+            if (cols[self.orientation] == 1) and (rows[self.orientation] != 1):
+                sawnArea = pieces[self.orientation] * (tempLength - sawWidth) * sawWidth
+            elif (cols[self.orientation] != 1) and (rows[self.orientation] == 1):
+                sawnArea = pieces[self.orientation] * (tempDepth - sawWidth) * sawWidth
+            elif (cols[self.orientation] == 1) and (rows[self.orientation] == 1):
                 sawnArea = 0
-            elif (cols[self.orientation] == 1):
-                sawnArea = rows[self.orientation] * sawWidth
-            elif (rows[self.orientation] == 1):
-                sawnArea = cols[self.orientation] * sawWidth
-            
-            if (sawnArea < 0):
-                sawnArea = 0
-            if (wasteArea < 0):
-                wasteArea = 0
-            
+                print('The amount of sawn waste is too complex to be useful')
+                print('So I didn\'t calculate it')
+
+            wasteArea = max(wasteArea, 0)
+            sawnArea  = max(sawnArea,0)
+
             try:
-                assert(usedArea <= maxArea)
-                assert(wasteArea < maxArea)
-                assert(wasteArea >= sawnArea)
+                assert(usedArea  <= maxArea)
+                assert(wasteArea <= maxArea)
+                assert(sawnArea  <= maxArea)
             except AssertionError:
                 print('There was something erroneous about the areas calculated\n'
                       + 'The maxArea was    : ' + str(maxArea) + ' (mm^2)\n'
@@ -331,15 +325,11 @@ class mainWindow(QDialog):
             cutY = int(self.dEdit.text()) + sawWidth + twiddle
             widX = sawWidth
             widY = sawWidth + twiddle
-            pCols = pCols + sawWidth + sawWidth + twiddle
-            pRows = pRows + sawWidth + sawWidth
         elif (self.orientation == 1):
             cutX = int(self.dEdit.text()) + sawWidth + twiddle
             cutY = int(self.lEdit.text()) + sawWidth
             widX = sawWidth + twiddle
             widY = sawWidth
-            pCols = pCols + sawWidth + sawWidth
-            pRows = pRows + sawWidth + sawWidth + twiddle
         else:
             return -1
 
