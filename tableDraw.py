@@ -180,6 +180,20 @@ class mainWindow(QDialog):
         self.dataOK &= self.testInt(self.sawEdit)
         self.dataOK &= self.testInt(self.depEdit,True)
 
+        # Check conformity of dimensions
+        if ((int(self.xEdit.text())) >= int(self.lEdit.text())):
+            if ((int(self.yEdit.text())) >= int(self.dEdit.text())):
+                self.dataOK &= True
+            else:
+                self.dataOK &= False
+        elif ((int(self.xEdit.text())) >= int(self.dEdit.text())):
+            if ((int(self.yEdit.text())) >= int(self.lEdit.text())):
+                self.dataOK &= True
+            else:
+                self.dataOK &= False
+        else:
+            self.dataOK &= False
+
     def testInt(self, lineEditWidget,okZero=False):
         # Check that the input can be cast to an int
         # If is can, make it positive, otherwise make it 0
@@ -254,9 +268,17 @@ class mainWindow(QDialog):
                        * int(self.lEdit.text())
                        * int(self.dEdit.text())) # mm^2
 
-            sawnArea = ((cols[self.orientation]) * inputX * sawWidth
-                       +(rows[self.orientation]) * inputY * sawWidth
-                       - pieces[self.orientation] * sawWidth * sawWidth)
+
+            if self.orientation == 0:
+                sawnArea = ((cols[0]) * inputX * sawWidth
+                           +(rows[0]) * inputY * sawWidth
+                           - pieces[0] * sawWidth * sawWidth)
+            elif self.orientation == 1:
+                sawnArea = ((cols[1]) * inputY * sawWidth
+                           +(rows[1]) * inputX * sawWidth
+                           - pieces[1] * sawWidth * sawWidth)
+
+
             
             wasteArea = maxArea - usedArea # mm^2
 
@@ -265,22 +287,28 @@ class mainWindow(QDialog):
                          * int(self.lEdit.text())
                          * 1e-6)
 
-            if (wasteArea < 0):
-                wasteArea = 0
-
+            if (cols[self.orientation] == 1) and (rows[self.orientation] == 1):
+                sawnArea = 0
+            elif (cols[self.orientation] == 1):
+                sawnArea = rows[self.orientation] * sawWidth
+            elif (rows[self.orientation] == 1):
+                sawnArea = cols[self.orientation] * sawWidth
+            
             if (sawnArea < 0):
                 sawnArea = 0
-            else:
-                if (cols[self.orientation] == 1) and (rows[self.orientation] == 1):
-                    sawnArea = 0
-                elif (cols[self.orientation] == 1):
-                    sawnArea = rows[self.orientation] * inputY
-                elif (rows[self.orientation] == 1):
-                    sawnArea = cols[self.orientation] * inputX
+            if (wasteArea < 0):
+                wasteArea = 0
             
-            # assert(usedArea <= maxArea)
-            # assert(wasteArea < maxArea)
-            # assert(wasteArea >= sawnArea)
+            try:
+                assert(usedArea <= maxArea)
+                assert(wasteArea < maxArea)
+                assert(wasteArea >= sawnArea)
+            except AssertionError:
+                print('There was something erroneous about the areas calculated\n'
+                      + 'The maxArea was    : ' + str(maxArea) + ' (mm^2)\n'
+                      + 'The usedArea was   : ' + str(usedArea) + ' (mm^2)\n'
+                      + 'The wasteArea was  : ' + str(wasteArea) + ' (mm^2)\n'
+                      + 'The sawnArea was   : ' + str(sawnArea) + ' (mm^2)')
 
             self.wNumPieces.setText('Pieces : ' + str(pieces[self.orientation]))
             self.wRotated.setText('Rotation : ' + str(self.orientation))
@@ -298,28 +326,31 @@ class mainWindow(QDialog):
         sawWidth = int(self.sawEdit.text())
         twiddle  = int(self.depEdit.text())
 
-
-        canvas = np.ones((pRows,pCols,3))
-
         if (self.orientation == 0):
             cutX = int(self.lEdit.text()) + sawWidth
             cutY = int(self.dEdit.text()) + sawWidth + twiddle
             widX = sawWidth
             widY = sawWidth + twiddle
-        elif (self.orientation == 1):
+            pCols = pCols + sawWidth * 2
+            pRows = pRows + sawWidth * 2
+        elif (self.orientation == 1):l
             cutX = int(self.dEdit.text()) + sawWidth + twiddle
             cutY = int(self.lEdit.text()) + sawWidth
             widX = sawWidth + twiddle
             widY = sawWidth
+            pCols = pCols + sawWidth * 2
+            pRows = pRows + sawWidth * 2
         else:
             return -1
+
+        canvas = np.ones((pRows,pCols,3))
 
         imgDim = 3
 
         # Make marks on the columns
         cCols = cutX
         fullCol = np.zeros((pRows,1,imgDim))
-        while (cCols < pCols):
+        while (cCols <= pCols):
 
             for i in range(widX):
                 canvas[:,cCols - i,:] = fullCol[:,0,:]
@@ -329,17 +360,25 @@ class mainWindow(QDialog):
         # Make marks on the columns
         cRows = cutY
         fullRow = np.zeros((1,pCols,imgDim))
-        while (cRows < pRows):
+        while (cRows <= pRows):
             for i in range(widY):
                 canvas[cRows - i,:,:] = fullRow[0,:,:]
 
             cRows += cutY
 
-        # Mark off the grey area of true wastage
+        # Mark off the waste area of true wastage
         cCols -= cutX
         cRows -= cutY
         gCols  = np.ones((pRows,1,imgDim)) * 0.5
+        gColor = np.array([[185/255.0, 185/255.0, 240/255.0]])
         gRows  = np.ones((1,pCols,imgDim)) * 0.5
+
+        tCols = np.copy(gCols)
+        for i in range(pRows):
+            gCols[i] = gColor
+
+        for i in range(pCols):
+            gRows[:,i] = gColor
 
         if cCols > 0:
             for cols in range(cCols,pCols):
@@ -362,8 +401,9 @@ class mainWindow(QDialog):
         scaledCols = int(scale * pCols)
 
         canvas = cv2.resize(canvas,(scaledCols,scaledRows))
-
-        qImg = QtGui.QImage(canvas,canvas.shape[1],canvas.shape[0],QtGui.QImage.Format_RGB888).rgbSwapped()
+        bpl = imgDim * scaledCols
+        
+        qImg = QtGui.QImage(canvas,canvas.shape[1],canvas.shape[0],bpl,QtGui.QImage.Format_RGB888).rgbSwapped()
         pMap = QtGui.QPixmap.fromImage(qImg)
         self.wImg.setPixmap(pMap)
 
