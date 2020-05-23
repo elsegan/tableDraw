@@ -331,15 +331,15 @@ class mainWindow(QDialog):
             cutY = int(self.dEdit.text()) + sawWidth + twiddle
             widX = sawWidth
             widY = sawWidth + twiddle
-            pCols = pCols + sawWidth * 2
-            pRows = pRows + sawWidth * 2
-        elif (self.orientation == 1):l
+            pCols = pCols + sawWidth + sawWidth + twiddle
+            pRows = pRows + sawWidth + sawWidth
+        elif (self.orientation == 1):
             cutX = int(self.dEdit.text()) + sawWidth + twiddle
             cutY = int(self.lEdit.text()) + sawWidth
             widX = sawWidth + twiddle
             widY = sawWidth
-            pCols = pCols + sawWidth * 2
-            pRows = pRows + sawWidth * 2
+            pCols = pCols + sawWidth + sawWidth
+            pRows = pRows + sawWidth + sawWidth + twiddle
         else:
             return -1
 
@@ -351,9 +351,11 @@ class mainWindow(QDialog):
         cCols = cutX
         fullCol = np.zeros((pRows,1,imgDim))
         while (cCols <= pCols):
-
             for i in range(widX):
-                canvas[:,cCols - i,:] = fullCol[:,0,:]
+                try:
+                    canvas[:,cCols - i,:] = fullCol[:,0,:]
+                except:
+                    continue
 
             cCols += cutX
 
@@ -362,7 +364,10 @@ class mainWindow(QDialog):
         fullRow = np.zeros((1,pCols,imgDim))
         while (cRows <= pRows):
             for i in range(widY):
-                canvas[cRows - i,:,:] = fullRow[0,:,:]
+                try:
+                    canvas[cRows - i,:,:] = fullRow[0,:,:]
+                except:
+                    continue
 
             cRows += cutY
 
@@ -382,12 +387,19 @@ class mainWindow(QDialog):
 
         if cCols > 0:
             for cols in range(cCols,pCols):
-                canvas[:,cols,:] = gCols[:,0,:]
+                try:
+                    canvas[:,cols,:] = gCols[:,0,:]
+                except:
+                    continue
         
         if cRows > 0:
             for rows in range(cRows,pRows):
-                canvas[rows,:,:] = gRows[0,:,:]
-    
+                try:
+                    canvas[rows,:,:] = gRows[0,:,:]
+                except:
+                    continue
+
+        canvas = canvas[:int(self.yEdit.text()),:int(self.xEdit.text()),:]
         dummyName = 'tempResultant.png'
         cv2.imwrite(dummyName,canvas * 255)
         canvas = cv2.imread(dummyName)
