@@ -152,13 +152,17 @@ class mainWindow(QDialog):
 
     def eval(self):
         self.checkData()
-
+        self.calcOK = 0
         if (self.dataOK):
-            self.calc()
-            self.vizualise()
+            self.calcOK = self.calc()
         else:
             self.wStatement.setText('There was something wrong with your dimensions\n'
                                     + 'It can\'t possibly exist!\n \n \n ')
+        if self.calcOK == 0:
+            self.vizualise()
+        else:
+            # I don't think its possible to end up here
+            self.wStatement.setText('There was not a piece that could be cut\n \n \n \n ')
 
     def checkData(self):
         self.dataOK = True
@@ -252,11 +256,15 @@ class mainWindow(QDialog):
         # Calculate the number of pieces made
         pieces.append(rows[0] * cols[0])
         pieces.append(rows[1] * cols[1])
-
+        
         if (pieces[0] >= pieces[1]):
             self.orientation = 0
+            self.rows = rows[0]
+            self.cols = cols[0]
         elif(pieces[1] > 0):
             self.orientation = 1
+            self.rows = rows[1]
+            self.cols = cols[1]
 
         warnArea = False
         if (self.orientation == -1):
@@ -313,6 +321,7 @@ class mainWindow(QDialog):
                                     + '\nBut sawn area is : ' + str((sawnArea * 100 / maxArea)) + ' %'
                                     + '\nSo real waste is : ' + str((wasteArea - sawnArea) * 100 / maxArea) + ' %'
                                     + '\nThe coverable area is : ' + str(tableArea) + ' m^2')
+        return 0
 
     def vizualise(self):
         pCols = int(self.xEdit.text())
@@ -321,11 +330,15 @@ class mainWindow(QDialog):
         twiddle  = int(self.depEdit.text())
 
         if (self.orientation == 0):
+            fX   = int(self.lEdit.text())
+            fY   = int(self.dEdit.text())
             cutX = int(self.lEdit.text()) + sawWidth
             cutY = int(self.dEdit.text()) + sawWidth + twiddle
             widX = sawWidth
             widY = sawWidth + twiddle
         elif (self.orientation == 1):
+            fX   = int(self.dEdit.text())
+            fY   = int(self.lEdit.text())
             cutX = int(self.dEdit.text()) + sawWidth + twiddle
             cutY = int(self.lEdit.text()) + sawWidth
             widX = sawWidth + twiddle
@@ -337,59 +350,48 @@ class mainWindow(QDialog):
 
         imgDim = 3
 
-        # Make marks on the columns
-        cCols = cutX
-        fullCol = np.zeros((pRows,1,imgDim))
-        while (cCols <= pCols):
-            for i in range(widX):
-                try:
-                    canvas[:,cCols - i,:] = fullCol[:,0,:]
-                except:
-                    continue
-
-            cCols += cutX
-
-        # Make marks on the columns
-        cRows = cutY
-        fullRow = np.zeros((1,pCols,imgDim))
-        while (cRows <= pRows):
-            for i in range(widY):
-                try:
-                    canvas[cRows - i,:,:] = fullRow[0,:,:]
-                except:
-                    continue
-
-            cRows += cutY
-
         # Mark off the waste area of true wastage
-        cCols -= cutX
-        cRows -= cutY
-        gCols  = np.ones((pRows,1,imgDim)) * 0.5
         gColor = np.array([[185/255.0, 185/255.0, 240/255.0]])
-        gRows  = np.ones((1,pCols,imgDim)) * 0.5
+        xCols  = np.ones((pRows,1,imgDim)) * 0.5
+        xRows  = np.ones((1,pCols,imgDim)) * 0.5
 
-        tCols = np.copy(gCols)
+        tCols = np.copy(xCols)
         for i in range(pRows):
-            gCols[i] = gColor
+            xCols[i] = gColor
 
         for i in range(pCols):
-            gRows[:,i] = gColor
+            xRows[:,i] = gColor
 
-        if cCols > 0:
-            for cols in range(cCols,pCols):
-                try:
-                    canvas[:,cols,:] = gCols[:,0,:]
-                except:
-                    continue
+        fullCol = np.zeros((pRows,1,imgDim))
+        fullRow = np.zeros((1,pCols,imgDim))
+        #canvas[:,columnToSet,:] = fullCol[:,0,:]
+        #canvas[rowToSet,:,:] = fullRow[0,:,:]
+
+        startCol = 0
+        for col in range(self.cols):
+            idxCol = fX + col * cutX
+            try:
+                for i in range(sawWidth):
+                    j = i + idxCol
+                    canvas[:,j,:] = fullCol[:,0,:]
+            except:
+                continue
         
-        if cRows > 0:
-            for rows in range(cRows,pRows):
-                try:
-                    canvas[rows,:,:] = gRows[0,:,:]
-                except:
-                    continue
+        for row in range(self.rows):
+            idxRow = fY + row * cutY
+            try:
+                for i in range(sawWidth):
+                    j = i + idxRow
+                    canvas[j,:,:] = fullRow[0,:,:]
+            except:
+                continue
+        # Color the waste
+        for idx in range(idxCol,pCols):
+            canvas[:,idx,:] = xCols[:,0,:]
+        for idx in range(idxRow,pRows):
+            canvas[idx,:,:] = xRows[0,:,:]
 
-        canvas = canvas[:int(self.yEdit.text()),:int(self.xEdit.text()),:]
+        # canvas = canvas[:int(self.yEdit.text()),:int(self.xEdit.text()),:]
         dummyName = 'tempResultant.png'
         cv2.imwrite(dummyName,canvas * 255)
         canvas = cv2.imread(dummyName)
